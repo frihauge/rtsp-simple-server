@@ -352,3 +352,16 @@ paths:
     runOnRead:
     # Restart the command if it exits suddenly.
     runOnReadRestart: no
+paths:
+  stream:
+    source: rpiCamera
+    rpiCameraWidth: 1920
+    rpiCameraHeight: 1080
+    rpiCameraFPS: 30
+    rpiCameraIDRPeriod: 10
+    rpiCameraProfile: main
+    rpiCameraLevel: '4.1'
+    rpiCameraBitrate: 8000000
+    #runOnReady: ffmpeg -i http://localhost:8888/stream/index.m3u8 -vframes 1 -y thumbnail.png
+    #runOnReadyRestart: yes
+    rpiCameraMode: '3840:2160:10:P'
