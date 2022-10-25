@@ -22,6 +22,15 @@
 
 char errbuf[256];
 
+static int xioctl(int fd, unsigned long ctl, void *arg)
+{
+	int ret, num_tries = 10;
+	do
+	{
+		ret = ioctl(fd, ctl, arg);
+	} while (ret == -1 && errno == EINTR && num_tries-- > 0);
+	return ret;
+}
 static void set_error(const char *format, ...) {
     va_list args;
     va_start(args, format);
@@ -61,7 +70,7 @@ static void *output_thread(void *userdata) {
             buf.memory = V4L2_MEMORY_DMABUF;
             buf.length = 1;
             buf.m.planes = planes;
-            int res = ioctl(encp->fd, VIDIOC_DQBUF, &buf);
+            int res = xioctl(encp->fd, VIDIOC_DQBUF, &buf);
             if (res != 0) {
                 fprintf(stderr, "output_thread(): ioctl(VIDIOC_DQBUF) failed\n");
                 exit(1);
@@ -73,7 +82,7 @@ static void *output_thread(void *userdata) {
             buf.memory = V4L2_MEMORY_MMAP;
             buf.length = 1;
             buf.m.planes = planes;
-            res = ioctl(encp->fd, VIDIOC_DQBUF, &buf);
+            res = xioctl(encp->fd, VIDIOC_DQBUF, &buf);
             if (res == 0) {
                 uint64_t ts = ((uint64_t)buf.timestamp.tv_sec * (uint64_t)1000000) + (uint64_t)buf.timestamp.tv_usec;
 
@@ -100,7 +109,7 @@ static void *output_thread(void *userdata) {
                 buf.m.planes = planes;
                 buf.m.planes[0].bytesused = 0;
                 buf.m.planes[0].length = length;
-                int res = ioctl(encp->fd, VIDIOC_QBUF, &buf);
+                int res = xioctl(encp->fd, VIDIOC_QBUF, &buf);
                 if (res < 0) {
                     fprintf(stderr, "output_thread(): ioctl(VIDIOC_QBUF) failed\n");
                     exit(1);
@@ -125,7 +134,7 @@ bool encoder_create(parameters_t *params, int stride, int colorspace, encoder_ou
     struct v4l2_control ctrl = {0};
     ctrl.id = V4L2_CID_MPEG_VIDEO_BITRATE;
     ctrl.value = params->bitrate;
-    int res = ioctl(encp->fd, VIDIOC_S_CTRL, &ctrl);
+    int res = xioctl(encp->fd, VIDIOC_S_CTRL, &ctrl);
     if (res != 0) {
         set_error("unable to set bitrate");
         close(encp->fd);
@@ -134,7 +143,7 @@ bool encoder_create(parameters_t *params, int stride, int colorspace, encoder_ou
 
     ctrl.id = V4L2_CID_MPEG_VIDEO_H264_PROFILE;
     ctrl.value = params->profile;
-    res = ioctl(encp->fd, VIDIOC_S_CTRL, &ctrl);
+    res = xioctl(encp->fd, VIDIOC_S_CTRL, &ctrl);
     if (res != 0) {
         set_error("unable to set profile");
         close(encp->fd);
@@ -143,7 +152,7 @@ bool encoder_create(parameters_t *params, int stride, int colorspace, encoder_ou
 
     ctrl.id = V4L2_CID_MPEG_VIDEO_H264_LEVEL;
     ctrl.value = params->level;
-    res = ioctl(encp->fd, VIDIOC_S_CTRL, &ctrl);
+    res = xioctl(encp->fd, VIDIOC_S_CTRL, &ctrl);
     if (res != 0) {
         set_error("unable to set level");
         close(encp->fd);
@@ -152,7 +161,7 @@ bool encoder_create(parameters_t *params, int stride, int colorspace, encoder_ou
 
     ctrl.id = V4L2_CID_MPEG_VIDEO_H264_I_PERIOD;
     ctrl.value = params->idr_period;
-    res = ioctl(encp->fd, VIDIOC_S_CTRL, &ctrl);
+    res = xioctl(encp->fd, VIDIOC_S_CTRL, &ctrl);
     if (res != 0) {
         set_error("unable to set IDR period");
         close(encp->fd);
@@ -161,7 +170,7 @@ bool encoder_create(parameters_t *params, int stride, int colorspace, encoder_ou
 
     ctrl.id = V4L2_CID_MPEG_VIDEO_REPEAT_SEQ_HEADER;
     ctrl.value = 0;
-    res = ioctl(encp->fd, VIDIOC_S_CTRL, &ctrl);
+    res = xioctl(encp->fd, VIDIOC_S_CTRL, &ctrl);
     if (res != 0) {
         set_error("unable to set REPEAT_SEQ_HEADER");
         close(encp->fd);
@@ -177,7 +186,7 @@ bool encoder_create(parameters_t *params, int stride, int colorspace, encoder_ou
     fmt.fmt.pix_mp.field = V4L2_FIELD_ANY;
     fmt.fmt.pix_mp.colorspace = colorspace;
     fmt.fmt.pix_mp.num_planes = 1;
-    res = ioctl(encp->fd, VIDIOC_S_FMT, &fmt);
+    res = xioctl(encp->fd, VIDIOC_S_FMT, &fmt);
     if (res != 0) {
         set_error("unable to set output format");
         close(encp->fd);
@@ -194,7 +203,7 @@ bool encoder_create(parameters_t *params, int stride, int colorspace, encoder_ou
     fmt.fmt.pix_mp.num_planes = 1;
     fmt.fmt.pix_mp.plane_fmt[0].bytesperline = 0;
     fmt.fmt.pix_mp.plane_fmt[0].sizeimage = 512 << 10;
-    res = ioctl(encp->fd, VIDIOC_S_FMT, &fmt);
+    res = xioctl(encp->fd, VIDIOC_S_FMT, &fmt);
     if (res != 0) {
         set_error("unable to set capture format");
         close(encp->fd);
@@ -205,7 +214,7 @@ bool encoder_create(parameters_t *params, int stride, int colorspace, encoder_ou
     parm.type = V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE;
     parm.parm.output.timeperframe.numerator = 1;
     parm.parm.output.timeperframe.denominator = params->fps;
-    res = ioctl(encp->fd, VIDIOC_S_PARM, &parm);
+    res = xioctl(encp->fd, VIDIOC_S_PARM, &parm);
     if (res != 0) {
         set_error("unable to set fps");
         close(encp->fd);
@@ -216,7 +225,7 @@ bool encoder_create(parameters_t *params, int stride, int colorspace, encoder_ou
     reqbufs.count = params->buffer_count;
     reqbufs.type = V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE;
     reqbufs.memory = V4L2_MEMORY_DMABUF;
-    res = ioctl(encp->fd, VIDIOC_REQBUFS, &reqbufs);
+    res = xioctl(encp->fd, VIDIOC_REQBUFS, &reqbufs);
     if (res != 0) {
         set_error("unable to set output buffers");
         close(encp->fd);
@@ -227,7 +236,7 @@ bool encoder_create(parameters_t *params, int stride, int colorspace, encoder_ou
     reqbufs.count = params->capture_buffer_count;
     reqbufs.type = V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE;
     reqbufs.memory = V4L2_MEMORY_MMAP;
-    res = ioctl(encp->fd, VIDIOC_REQBUFS, &reqbufs);
+    res = xioctl(encp->fd, VIDIOC_REQBUFS, &reqbufs);
     if (res != 0) {
         set_error("unable to set capture buffers");
         close(encp->fd);
@@ -245,7 +254,7 @@ bool encoder_create(parameters_t *params, int stride, int colorspace, encoder_ou
         buffer.index = i;
         buffer.length = 1;
         buffer.m.planes = planes;
-        int res = ioctl(encp->fd, VIDIOC_QUERYBUF, &buffer);
+        int res = xioctl(encp->fd, VIDIOC_QUERYBUF, &buffer);
         if (res != 0) {
             set_error("unable to query buffer");
             free(encp->capture_buffers);
@@ -266,7 +275,7 @@ bool encoder_create(parameters_t *params, int stride, int colorspace, encoder_ou
             return false;
         }
 
-        res = ioctl(encp->fd, VIDIOC_QBUF, &buffer);
+        res = xioctl(encp->fd, VIDIOC_QBUF, &buffer);
         if (res != 0) {
             set_error("ioctl(VIDIOC_QBUF) failed");
             free(encp->capture_buffers);
@@ -276,7 +285,7 @@ bool encoder_create(parameters_t *params, int stride, int colorspace, encoder_ou
     }
 
     enum v4l2_buf_type type = V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE;
-    res = ioctl(encp->fd, VIDIOC_STREAMON, &type);
+    res = xioctl(encp->fd, VIDIOC_STREAMON, &type);
     if (res != 0) {
         set_error("unable to activate output stream");
         free(encp->capture_buffers);
@@ -285,7 +294,7 @@ bool encoder_create(parameters_t *params, int stride, int colorspace, encoder_ou
     }
 
     type = V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE;
-    res = ioctl(encp->fd, VIDIOC_STREAMON, &type);
+    res = xioctl(encp->fd, VIDIOC_STREAMON, &type);
     if (res != 0) {
         set_error("unable to activate capture stream");
         free(encp->capture_buffers);
