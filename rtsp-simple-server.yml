@@ -98,7 +98,7 @@ authMethods: [basic, digest]
 # RTMP parameters
 
 # Disable support for the RTMP protocol.
-rtmpDisable: no
+rtmpDisable: yes
 # Address of the RTMP listener. This is needed only when encryption is "no" or "optional".
 rtmpAddress: :1935
 # Encrypt connections with TLS (RTMPS).
@@ -123,7 +123,7 @@ hlsDisable: no
 hlsAddress: :8888
 # By default, HLS is generated only when requested by a user.
 # This option allows to generate it always, avoiding the delay between request and generation.
-hlsAlwaysRemux: no
+hlsAlwaysRemux: yes
 # Variant of the HLS protocol to use. Available options are:
 # * mpegts - uses MPEG-TS segments, for maximum compatibility.
 # * fmp4 - uses fragmented MP4 segments, more efficient.
@@ -132,13 +132,13 @@ hlsVariant: mpegts
 # Number of HLS segments to keep on the server.
 # Segments allow to seek through the stream.
 # Their number doesn't influence latency.
-hlsSegmentCount: 7
+hlsSegmentCount: 30
 # Minimum duration of each segment.
 # A player usually puts 3 segments in a buffer before reproducing the stream.
 # The final segment duration is also influenced by the interval between IDR frames,
 # since the server changes the duration in order to include at least one IDR frame
 # in each segment.
-hlsSegmentDuration: 1s
+hlsSegmentDuration: 10s
 # Minimum duration of each part.
 # A player usually puts 3 parts in a buffer before reproducing the stream.
 # Parts are used in Low-Latency HLS in place of segments.
@@ -153,7 +153,7 @@ hlsSegmentMaxSize: 50M
 hlsAllowOrigin: '*'
 # Enable TLS/HTTPS on the HLS server.
 # This is required for Low-Latency HLS.
-hlsEncryption: no
+hlsEncryption: yes
 # Path to the server key. This is needed only when encryption is yes.
 # This can be generated with:
 # openssl genrsa -out server.key 2048
@@ -187,7 +187,7 @@ paths:
     # * https://existing-url/stream.m3u8 -> the stream is pulled from another HLS server with HTTPS
     # * redirect -> the stream is provided by another path or server
     # * rpiCamera -> the stream is provided by a Raspberry Pi Camera
-    source: publisher
+    source: rpiCamera
 
     # If the source is an RTSP or RTSPS URL, this is the protocol that will be used to
     # pull the stream. available values are "automatic", "udp", "multicast", "tcp".
@@ -237,7 +237,7 @@ paths:
     # flip horizontally
     rpiCameraHFlip: false
     # flip vertically
-    rpiCameraVFlip: false
+    rpiCameraVFlip: true
     # brightness [-1, 1]
     rpiCameraBrightness: 0
     # contrast [0, 16]
@@ -274,7 +274,7 @@ paths:
     # frames per second
     rpiCameraFPS: 30
     # period between IDR frames
-    rpiCameraIDRPeriod: 60
+    rpiCameraIDRPeriod: 10
     # bitrate
     rpiCameraBitrate: 1000000
     # H264 profile
@@ -364,4 +364,5 @@ paths:
     rpiCameraBitrate: 8000000
     #runOnReady: ffmpeg -i http://localhost:8888/stream/index.m3u8 -vframes 1 -y thumbnail.png
     #runOnReadyRestart: yes
+    rpiCameraVFlip: true
     rpiCameraMode: '3840:2160:10:P'
