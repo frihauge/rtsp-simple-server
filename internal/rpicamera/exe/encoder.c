@@ -333,7 +333,7 @@ void encoder_encode(encoder_t *enc, int buffer_fd, size_t size, int64_t timestam
     buf.m.planes[0].length = size;
     int res = ioctl(encp->fd, VIDIOC_QBUF, &buf);
     if (res != 0) {
-        fprintf(stderr, "encoder_encode(): ioctl(VIDIOC_QBUF) failed\n");
-        exit(1);
+        fprintf(stderr, "encoder_encode(): ioctl() failed- This error will be ignored\n");
+        //exit(1);
     }
 }
