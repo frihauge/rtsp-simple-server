@@ -20,7 +20,7 @@
 #define DEVICE              "/dev/video11"
 #define POLL_TIMEOUT_MS     200
 
-char errbuf[256];
+static char errbuf[256];
 
 static int xioctl(int fd, unsigned long ctl, void *arg)
 {
@@ -333,7 +333,7 @@ void encoder_encode(encoder_t *enc, int buffer_fd, size_t size, int64_t timestam
     buf.m.planes[0].length = size;
     int res = ioctl(encp->fd, VIDIOC_QBUF, &buf);
     if (res != 0) {
-        fprintf(stderr, "encoder_encode(): ioctl() failed- This error will be ignored\n");
-        //exit(1);
+        fprintf(stderr, "encoder_encode(): ioctl(VIDIOC_QBUF) failed\n");
+        // it happens when the raspberry is under pressure. do not exit.
     }
 }

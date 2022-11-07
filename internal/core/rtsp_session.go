@@ -9,6 +9,7 @@ import (
 
 	"github.com/aler9/gortsplib"
 	"github.com/aler9/gortsplib/pkg/base"
+	"github.com/pion/rtp"
 
 	"github.com/aler9/rtsp-simple-server/internal/conf"
 	"github.com/aler9/rtsp-simple-server/internal/externalcmd"
@@ -38,13 +39,12 @@ type rtspSession struct {
 	pathManager     rtspSessionPathManager
 	parent          rtspSessionParent
 
-	created         time.Time
-	path            *path
-	stream          *stream
-	state           gortsplib.ServerSessionState
-	stateMutex      sync.Mutex
-	onReadCmd       *externalcmd.Cmd // read
-	announcedTracks gortsplib.Tracks // publish
+	created    time.Time
+	path       *path
+	stream     *stream
+	state      gortsplib.ServerSessionState
+	stateMutex sync.Mutex
+	onReadCmd  *externalcmd.Cmd // read
 }
 
 func newRTSPSession(
@@ -154,7 +154,6 @@ func (s *rtspSession) onAnnounce(c *rtspConn, ctx *gortsplib.ServerHandlerOnAnno
 	}
 
 	s.path = res.path
-	s.announcedTracks = ctx.Tracks
 
 	s.stateMutex.Lock()
 	s.state = gortsplib.ServerSessionStatePreRecord
@@ -288,7 +287,7 @@ func (s *rtspSession) onPlay(ctx *gortsplib.ServerHandlerOnPlayCtx) (*base.Respo
 func (s *rtspSession) onRecord(ctx *gortsplib.ServerHandlerOnRecordCtx) (*base.Response, error) {
 	res := s.path.publisherStart(pathPublisherStartReq{
 		author:             s,
-		tracks:             s.announcedTracks,
+		tracks:             s.ss.AnnouncedTracks(),
 		generateRTPPackets: false,
 	})
 	if res.err != nil {
@@ -300,7 +299,7 @@ func (s *rtspSession) onRecord(ctx *gortsplib.ServerHandlerOnRecordCtx) (*base.R
 	s.log(logger.Info, "is publishing to path '%s', with %s, %s",
 		s.path.Name(),
 		s.ss.SetuppedTransport(),
-		sourceTrackInfo(s.announcedTracks))
+		sourceTrackInfo(s.ss.AnnouncedTracks()))
 
 	s.stream = res.stream
 
@@ -342,7 +341,7 @@ func (s *rtspSession) onPause(ctx *gortsplib.ServerHandlerOnPauseCtx) (*base.Res
 }
 
 // onReaderData implements reader.
-func (s *rtspSession) onReaderData(data *data) {
+func (s *rtspSession) onReaderData(data data) {
 	// packets are routed to the session by gortsplib.ServerStream.
 }
 
@@ -378,19 +377,36 @@ func (s *rtspSession) apiSourceDescribe() interface{} {
 
 // onPacketRTP is called by rtspServer.
 func (s *rtspSession) onPacketRTP(ctx *gortsplib.ServerHandlerOnPacketRTPCtx) {
-	if ctx.H264NALUs != nil {
-		s.stream.writeData(&data{
+	var err error
+
+	switch s.ss.AnnouncedTracks()[ctx.TrackID].(type) {
+	case *gortsplib.TrackH264:
+		err = s.stream.writeData(&dataH264{
 			trackID:      ctx.TrackID,
-			rtpPacket:    ctx.Packet,
+			rtpPackets:   []*rtp.Packet{ctx.Packet},
 			ptsEqualsDTS: ctx.PTSEqualsDTS,
-			pts:          ctx.H264PTS,
-			h264NALUs:    ctx.H264NALUs,
 		})
-	} else {
-		s.stream.writeData(&data{
+
+	case *gortsplib.TrackMPEG4Audio:
+		err = s.stream.writeData(&dataMPEG4Audio{
+			trackID:    ctx.TrackID,
+			rtpPackets: []*rtp.Packet{ctx.Packet},
+		})
+
+	default:
+		err = s.stream.writeData(&dataGeneric{
 			trackID:      ctx.TrackID,
-			rtpPacket:    ctx.Packet,
+			rtpPackets:   []*rtp.Packet{ctx.Packet},
 			ptsEqualsDTS: ctx.PTSEqualsDTS,
 		})
 	}
+
+	if err != nil {
+		s.log(logger.Warn, "%v", err)
+	}
+}
+
+// onDecodeError is called by rtspServer.
+func (s *rtspSession) onDecodeError(ctx *gortsplib.ServerHandlerOnDecodeErrorCtx) {
+	s.log(logger.Warn, "%v", ctx.Error)
 }
